@@ -5,15 +5,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 300
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Free disk space
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
-      - name: Build installer (nixos-superbird builder)
-        run: sudo modprobe loop || true; ls /dev/loop* | head -3; docker run --privileged -v /dev:/dev -v "$PWD:/workdir" ghcr.io/joeyeamigh/nixos-superbird/builder:latest
-      - name: List output
-        run: sudo chown -R "$(id -u):$(id -g)" out && ls -la out
+      - name: Nix build (nixos-superbird builder, build only)
+        run: |
+          docker run --privileged -v "$PWD:/workdir" -w /workdir ghcr.io/joeyeamigh/nixos-superbird/builder:latest \
+            bash -c 'nix build ".#nixosConfigurations.superbird.config.system.build.installer" -j"$(nproc)" --show-trace \
+                     && rm -rf out && mkdir out && cp -rL result/* out/ && chown -R 1001:1001 out'
+      - name: Boot partition (mtools instead of the loop mount in make-bootfs.sh)
+        working-directory: out
+        run: |
+          sudo apt-get install -y -qq mtools >/dev/null
+          sudo chown -R "$(id -u):$(id -g)" . && chmod -R u+w .
+          mv builder/bootfs-blank.bin bootfs.bin
+          IMG="bootfs.bin@@4194304"          # FAT filesystem at 4 MiB offset (same as make-bootfs.sh)
+          mcopy -o -i "$IMG" builder/kernel ::Image
+          mcopy -o -i "$IMG" builder/superbird.dtb ::superbird.dtb
+          mcopy -o -i "$IMG" builder/initrd ::initrd
+          mcopy -o -i "$IMG" builder/bootargs.txt ::bootargs.txt
+          mdir -i "$IMG"
+          rm -rf builder
+          ls -la
       - uses: actions/upload-artifact@v4
         with:
           name: carthing-ha-installer
