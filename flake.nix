@@ -59,6 +59,10 @@
                 PI=${piBtMac}
                 FAILS=/run/carthing-pan.failures
                 bluetoothctl power on || true
+                # Without "pairable" BlueZ pairs WITHOUT bonding: no link key is stored and both sides forget
+                # each other after the first disconnect (what broke the reconnect after a power cut, 2026-10-26).
+                bluetoothctl pairable-timeout 0 >/dev/null 2>&1 || true
+                bluetoothctl pairable on || true
                 n=$(cat $FAILS 2>/dev/null || echo 0)
                 if [ "$n" -ge 3 ]; then
                   echo "3 failed connects: removing the bond with $PI and pairing again"
