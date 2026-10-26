@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Thing status</title>
+<style>
+  html, body { margin:0; width:800px; height:480px; background:#000; color:#a32020; overflow:hidden; cursor:none;
+               font:18px -apple-system, system-ui, sans-serif; }
+  .wrap { padding:22px 28px; display:flex; flex-direction:column; gap:14px; height:100%; box-sizing:border-box; }
+  h1 { margin:0; font-size:24px; font-weight:600; display:flex; justify-content:space-between; }
+  h1 span { font-size:16px; color:#5c1010; font-weight:500; }
+  ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  li { display:flex; gap:12px; align-items:baseline; font-size:20px; }
+  li b { width:26px; text-align:center; } li.bad { color:#d42a2a; } li.ok { color:#7f1818; } li small { color:#5c1010; font-size:15px; }
+  .hint { font-size:19px; color:#d42a2a; min-height:26px; }
+  pre { margin:0; flex:1; overflow:hidden; font:13px/1.35 ui-monospace, Menlo, monospace; color:#5c1010; white-space:pre-wrap; }
+</style></head>
+<body><div class="wrap">
+  <h1>Car Thing <span id="t">starting…</span></h1>
+  <ul id="list"></ul>
+  <div class="hint" id="hint"></div>
+  <pre id="log"></pre>
+</div>
+<script>
+let okCount = 0;
+const item = (ok, text, sub) => `<li class="${ok ? 'ok' : 'bad'}"><b>${ok ? '✓' : '✗'}</b>${text}${sub ? ` <small>${sub}</small>` : ''}</li>`;
+async function tick() {
+  let s; try { s = await (await fetch('/status.json')).json(); } catch (e) { return setTimeout(tick, 2000); }
+  document.getElementById('t').textContent = s.time + ' · up ' + Math.round(s.uptime / 60) + ' min';
+  document.getElementById('list').innerHTML =
+    item(s.powered, 'Bluetooth on') +
+    item(s.paired && s.bonded, 'Paired with the Pi', s.paired && !s.bonded ? 'not bonded: will be forgotten' : '') +
+    item(s.connected && s.ip, 'Connected to the Pi', s.ip || '') +
+    item(s.dashboard, 'Dashboard reachable', '10.44.0.1:8790');
+  const hint = !s.powered ? 'Bluetooth is off.'
+    : !s.paired ? 'Not paired yet: open the pairing on the Pi (pi-pair-window.sh) or wait for the Pi\'s pairing agent.'
+    : !s.connected ? 'Paired, but no connection: out of range of the Pi? Move closer, it reconnects by itself.'
+    : !s.ip ? 'Connected, waiting for an address from the Pi…'
+    : !s.dashboard ? 'Network is up, but the dashboard on the Pi does not answer (carthing-dashboard service).'
+    : 'All good: opening the dashboard…';
+  document.getElementById('hint').textContent = hint;
+  document.getElementById('log').textContent = (s.log || []).join('\n');
+  okCount = s.dashboard ? okCount + 1 : 0;
+  if (okCount >= 2) { location.href = 'http://10.44.0.1:8790/'; return; }
+  setTimeout(tick, 2000);
+}
+tick();
+</script></body></html>

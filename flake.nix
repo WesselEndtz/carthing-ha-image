@@ -36,7 +36,8 @@
           {
             superbird.name = "carthing-ha";
             superbird.description = "Car Thing wireless Home Assistant dashboard";
-            superbird.gui.kiosk_url = "http://10.44.0.1:8790/";
+            # the kiosk opens the local status screen first; it forwards to the dashboard (10.44.0.1:8790) once reachable
+            superbird.gui.kiosk_url = "http://127.0.0.1:8080/";
             superbird.bluetooth.enable = true;
             superbird.bluetooth.name = "Car Thing HA";
             hardware.bluetooth.powerOnBoot = lib.mkForce true;
@@ -73,6 +74,19 @@
               '';
             };
             networking.interfaces.bnep0.useDHCP = true;
+
+            # Status screen: Bluetooth / bond / link / dashboard checklist + connection log (carthing/nixos/status)
+            systemd.services.carthing-status = {
+              description = "Car Thing status screen (127.0.0.1:8080)";
+              wantedBy = [ "multi-user.target" ];
+              before = [ "weston-tty1.service" ];
+              path = [ pkgs.bluez pkgs.iproute2 pkgs.systemd pkgs.coreutils ];
+              serviceConfig = {
+                ExecStart = "${pkgs.python3Minimal}/bin/python3 ${./status}/status.py";
+                Restart = "always";
+                RestartSec = 3;
+              };
+            };
 
             users.users.root.openssh.authorizedKeys.keys = [
               "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOKaibkMNWFEQFnSgkhqcKEv74kF1eND7FYaugFipCe3"
