@@ -53,32 +53,23 @@
               path = [ pkgs.bluez pkgs.bluez-tools pkgs.coreutils pkgs.gnugrep pkgs.systemd ];
               serviceConfig = { Restart = "always"; RestartSec = 10; };
               script = ''
-                # Self-healing: if the Pi forgot us (or we forgot it), drop the stale bond after 3 failed
-                # connects and pair again. ConnectDevice creates the device by address, so the Pi doesn't
-                # need to be discoverable (it still has to accept the pairing).
+                # Pair once (bonded), then keep the NAP link up. Being out of range just means retrying; the bond
+                # is never dropped automatically (an earlier "remove after 3 failures" broke the pairing upstairs).
                 PI=${piBtMac}
-                FAILS=/run/carthing-pan.failures
                 bluetoothctl power on || true
                 # Without "pairable" BlueZ pairs WITHOUT bonding: no link key is stored and both sides forget
                 # each other after the first disconnect (what broke the reconnect after a power cut, 2026-10-26).
                 bluetoothctl pairable-timeout 0 >/dev/null 2>&1 || true
                 bluetoothctl pairable on || true
-                n=$(cat $FAILS 2>/dev/null || echo 0)
-                if [ "$n" -ge 3 ]; then
-                  echo "3 failed connects: removing the bond with $PI and pairing again"
-                  bluetoothctl remove "$PI" || true
-                  echo 0 > $FAILS; n=0
-                fi
                 if ! bluetoothctl info "$PI" | grep -q "Paired: yes"; then
-                  echo "pairing with $PI"
+                  echo "pairing with $PI (the Pi must be in its pairing window)"
                   busctl call org.bluez /org/bluez/hci0 org.bluez.Adapter1 ConnectDevice 'a{sv}' 1 Address s "$PI" >/dev/null 2>&1 \
                     || timeout 25 bluetoothctl --timeout 20 scan on >/dev/null 2>&1 || true
-                  bluetoothctl --agent NoInputNoOutput pair "$PI" || { echo $((n + 1)) > $FAILS; exit 1; }
+                  bluetoothctl --agent NoInputNoOutput pair "$PI" || exit 1
                 fi
                 bluetoothctl trust "$PI" || true
                 echo "connecting NAP"
-                bt-network -c "$PI" nap || { echo $((n + 1)) > $FAILS; exit 1; }
-                echo 0 > $FAILS
+                exec bt-network -c "$PI" nap
               '';
             };
             networking.interfaces.bnep0.useDHCP = true;
