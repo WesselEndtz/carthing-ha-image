@@ -24,7 +24,7 @@ let okCount = 0;
 const item = (ok, text, sub) => `<li class="${ok ? 'ok' : 'bad'}"><b>${ok ? '✓' : '✗'}</b>${text}${sub ? ` <small>${sub}</small>` : ''}</li>`;
 async function tick() {
   let s; try { s = await (await fetch('/status.json')).json(); } catch (e) { return setTimeout(tick, 2000); }
-  document.getElementById('t').textContent = s.time + ' · up ' + Math.round(s.uptime / 60) + ' min';
+  document.getElementById('t').textContent = (s.time ? s.time + ' · ' : '') + 'up ' + Math.round(s.uptime / 60) + ' min';
   document.getElementById('list').innerHTML =
     item(s.powered, 'Bluetooth on') +
     item(s.paired && s.bonded, 'Paired with the Pi', s.paired && !s.bonded ? 'not bonded: will be forgotten' : '') +

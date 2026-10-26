@@ -31,7 +31,8 @@ def status() -> dict:
         dash = False
     log = [l for l in run("journalctl", "-u", "carthing-pan", "-n", "12", "--no-pager", "-o", "cat").splitlines()
            if "bpf-firewall" not in l and "AdvertisementMonitor" not in l][-6:]
-    return {"time": time.strftime("%H:%M:%S"), "uptime": run("cat", "/proc/uptime").split(" ")[0],
+    clock_ok = time.localtime().tm_year >= 2026        # no RTC and often no NTP: don't show a clock that is years off
+    return {"time": time.strftime("%H:%M:%S") if clock_ok else "", "uptime": run("cat", "/proc/uptime").split(" ")[0],
             "powered": "Powered: yes" in show, "paired": "Paired: yes" in info, "bonded": "Bonded: yes" in info,
             "connected": "Connected: yes" in info, "ip": ip, "dashboard": dash, "log": log}
 
