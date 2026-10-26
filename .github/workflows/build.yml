@@ -21,6 +21,10 @@ jobs:
           sudo apt-get install -y -qq mtools >/dev/null
           sudo chown -R "$(id -u):$(id -g)" . && chmod -R u+w .
           mv builder/bootfs-blank.bin bootfs.bin
+          # show boot progress on the screen (stock bootargs only log to the internal serial port);
+          # the last console= becomes /dev/console, so systemd's status lines land on the display
+          sed -i '1s/$/ console=tty0 systemd.show_status=1 loglevel=4/' builder/bootargs.txt
+          cat builder/bootargs.txt
           IMG="bootfs.bin@@4194304"          # FAT filesystem at 4 MiB offset (same as make-bootfs.sh)
           mcopy -o -i "$IMG" builder/kernel ::Image
           mcopy -o -i "$IMG" builder/superbird.dtb ::superbird.dtb
